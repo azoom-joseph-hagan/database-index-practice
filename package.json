@@ -1,0 +1,20 @@
+{
+  "name": "database-index-practice",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "seed": "node --env-file=.env --import=tsx src/seed.ts",
+    "demo": "node --env-file=.env --import=tsx src/demos/run-demos.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.39.0",
+    "drizzle-seed": "^0.3.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
