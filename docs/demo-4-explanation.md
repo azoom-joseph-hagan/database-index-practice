@@ -7,7 +7,7 @@
 SELECT o.id, o.total_amount, oi.product_id, oi.quantity, oi.unit_price
 FROM orders o
 JOIN order_items oi ON oi.order_id = o.id
-WHERE o.customer_id = 37760
+WHERE o.customer_id = 37760;
 ```
 
 ## What Happens Without an Index
@@ -22,8 +22,8 @@ In practice, PostgreSQL optimizes this — it does not do 20 separate full scans
 ## Why the Indexes Help
 
 ```sql
-CREATE INDEX idx_orders_customer_id ON orders (customer_id)
-CREATE INDEX idx_order_items_order_id ON order_items (order_id)
+CREATE INDEX idx_orders_customer_id ON orders (customer_id);
+CREATE INDEX idx_order_items_order_id ON order_items (order_id);
 ```
 
 With both indexes in place, the plan changes completely:
@@ -40,3 +40,10 @@ This is why this demo usually shows the largest speedup (often 50–100x or more
 - **Join columns**: Any column used in a `JOIN ... ON` condition is a strong candidate for indexing. Without it, PostgreSQL may need to scan the entire table for each probe.
 - **Combined selectivity**: The `WHERE` clause narrows orders to ~20 rows, and the join further narrows order_items to ~60 rows. Indexes let PostgreSQL take advantage of this selectivity at every step.
 - **Two indexes working together**: This demo shows how indexes combine. One index alone would help, but both together turn a multi-million-row operation into a sub-millisecond lookup.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_customer_id;
+DROP INDEX idx_order_items_order_id;
+```

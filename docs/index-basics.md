@@ -44,6 +44,7 @@ Indexes are not magic. They're useless — or even harmful — when:
 - **Tiny tables**: If the table only has 500 rows, it fits in a couple of disk pages. Reading it all is already fast — an index adds no meaningful benefit.
 - **You need every row anyway**: Queries like `COUNT(*) GROUP BY status` must touch every row regardless. An index can't skip anything.
 
+
 ## The Cost of Indexes
 
 Indexes aren't free:
@@ -139,6 +140,36 @@ Read it bottom-up: the innermost operations happen first. Here, PostgreSQL:
 2. Fetches those order rows
 3. For each order, uses another index to find its order_items
 4. Joins them together in a nested loop
+
+
+
+## Why Single-Query Times Are Misleading
+
+A query that takes 15ms looks fine in isolation. But in production, two things make it much worse:
+
+### Network latency
+
+These demos run locally — the app and database are on the same machine, so there is almost no network delay. In production, your database is usually on a separate server. Each query adds a **network round-trip** of 1–5ms (same data center) or 20–50ms+ (different regions).
+
+With 5ms of network overhead added to each query:
+
+- **Indexed query**: 0.02ms DB + 5ms network = **~5ms total**
+- **Unindexed query**: 15ms DB + 5ms network = **~20ms total**
+
+The total time difference looks small (4x). But the database is doing **750x more work** for the unindexed query — and that work adds up fast when many requests arrive at the same time.
+
+### Cumulative cost under load
+
+Databases don't serve one request at a time. If 100 requests hit an endpoint:
+
+- **Without an index**: 15ms × 100 = **1.5 seconds** of database time
+- **With an index**: 0.02ms × 100 = **2 milliseconds**
+
+Each slow query also holds a database connection longer. Most apps use a connection pool of 10–20 connections — once those are occupied by slow queries, new requests queue up and users see timeouts. An indexed query releases its connection almost immediately, keeping the pool available.
+
+The demos show this directly — after each EXPLAIN ANALYZE, you'll see a "If 100 requests hit this endpoint" section showing real cumulative wall-clock time. Demo 4 (the JOIN query) is the most dramatic: ~7 seconds without indexes vs ~40ms with them.
+
+A missing index is invisible in development but degrades the entire application under production traffic.
 
 ## Quick Reference
 

@@ -5,6 +5,7 @@ const pool = new pg.Pool({
 });
 
 const ITERATIONS = 5;
+const LOAD_QUERIES = 100;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ interface DemoResult {
   label: string;
   timeMs: number;
   plan: string;
+  loadMs?: number;
 }
 
 function extractExecutionTime(plan: string): number {
@@ -65,12 +67,37 @@ async function dropIndex(name: string) {
   await pool.query(`DROP INDEX IF EXISTS ${name}`);
 }
 
+async function simulateLoad(
+  sql: string,
+  params: unknown[] = []
+): Promise<number> {
+  const start = performance.now();
+  for (let i = 0; i < LOAD_QUERIES; i++) {
+    await pool.query(sql, params);
+  }
+  return performance.now() - start;
+}
+
+function formatTime(ms: number): string {
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
+  return `${ms.toFixed(0)} ms`;
+}
+
+function printLoadComparison(loads: { label: string; ms: number }[]) {
+  console.log(`  If ${LOAD_QUERIES} requests hit this endpoint:`);
+  for (const l of loads) {
+    console.log(`      ${l.label.padEnd(30)} ${formatTime(l.ms).padStart(10)}`);
+  }
+  console.log("");
+}
+
 function printComparison(
   demoNum: number,
   title: string,
   description: string,
   without: DemoResult,
-  withIdx: DemoResult
+  withIdx: DemoResult,
+  loadResults?: { label: string; ms: number }[]
 ) {
   const speedup = without.timeMs / withIdx.timeMs;
   const bar = "═".repeat(70);
@@ -113,13 +140,18 @@ function printComparison(
     console.log(`    ${line}`);
   }
   console.log("");
+
+  if (loadResults) {
+    printLoadComparison(loadResults);
+  }
 }
 
 function printSingleResult(
   demoNum: number,
   title: string,
   description: string,
-  results: { label: string; timeMs: number; plan?: string }[]
+  results: { label: string; timeMs: number; plan?: string }[],
+  loadResults?: { label: string; ms: number }[]
 ) {
   const bar = "═".repeat(70);
 
@@ -144,6 +176,10 @@ function printSingleResult(
     }
   }
   console.log("");
+
+  if (loadResults) {
+    printLoadComparison(loadResults);
+  }
 }
 
 // ─── Warm up ────────────────────────────────────────────────────────────────
@@ -162,14 +198,16 @@ async function warmUp() {
 // ─── Part 1: Where Indexes WIN ──────────────────────────────────────────────
 
 async function demo1() {
-  const sql = `SELECT * FROM customers WHERE last_name = 'Smith'`;
+  const sql = `SELECT * FROM customers WHERE last_name = 'Swallows'`;
 
   const without = await timeQuery("No index", sql);
+  const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_customers_last_name ON customers (last_name)`
   );
   const withIdx = await timeQuery("With index", sql);
+  const loadWith = await simulateLoad(sql);
   await dropIndex("idx_customers_last_name");
 
   printComparison(
@@ -177,7 +215,11 @@ async function demo1() {
     "Lookup by last_name (50k rows)",
     "Selective text search on a medium table → Index Scan wins",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
@@ -190,11 +232,13 @@ async function demo2() {
   const sql = `SELECT * FROM orders WHERE customer_id = $1`;
 
   const without = await timeQuery("No index", sql, [custId]);
+  const loadWithout = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_customer_id ON orders (customer_id)`
   );
   const withIdx = await timeQuery("With index", sql, [custId]);
+  const loadWith = await simulateLoad(sql, [custId]);
   await dropIndex("idx_orders_customer_id");
 
   printComparison(
@@ -202,7 +246,11 @@ async function demo2() {
     "Orders by customer_id (1M rows)",
     "FK lookup returning ~20 rows from 1M → massive speedup",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
@@ -210,11 +258,13 @@ async function demo3() {
   const sql = `SELECT * FROM orders WHERE created_at BETWEEN '2024-06-01' AND '2024-06-07'`;
 
   const without = await timeQuery("No index", sql);
+  const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_orders_created_at ON orders (created_at)`
   );
   const withIdx = await timeQuery("With index", sql);
+  const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_created_at");
 
   printComparison(
@@ -222,7 +272,11 @@ async function demo3() {
     "Date range on orders.created_at",
     "Narrow 7-day window from 3 years of data → Index Range Scan",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
@@ -240,6 +294,7 @@ async function demo4() {
   `;
 
   const without = await timeQuery("No index", sql, [custId]);
+  const loadWithout = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_customer_id ON orders (customer_id)`
@@ -248,6 +303,7 @@ async function demo4() {
     `CREATE INDEX idx_order_items_order_id ON order_items (order_id)`
   );
   const withIdx = await timeQuery("With index", sql, [custId]);
+  const loadWith = await simulateLoad(sql, [custId]);
   await dropIndex("idx_orders_customer_id");
   await dropIndex("idx_order_items_order_id");
 
@@ -256,7 +312,11 @@ async function demo4() {
     "JOIN orders + order_items for a customer",
     "Nested loop with seq scans vs indexed join → huge difference",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
@@ -273,16 +333,19 @@ async function demo5() {
   `;
 
   const without = await timeQuery("No index", sql, [custId]);
+  const loadNone = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_customer_id ON orders (customer_id)`
   );
   const singleIdx = await timeQuery("Single-col index", sql, [custId]);
+  const loadSingle = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at)`
   );
   const compositeIdx = await timeQuery("Composite index", sql, [custId]);
+  const loadComposite = await simulateLoad(sql, [custId]);
 
   await dropIndex("idx_orders_customer_id");
   await dropIndex("idx_orders_cust_date");
@@ -303,6 +366,11 @@ async function demo5() {
         timeMs: compositeIdx.timeMs,
         plan: compositeIdx.plan,
       },
+    ],
+    [
+      { label: "No index", ms: loadNone },
+      { label: "Single-col (customer_id)", ms: loadSingle },
+      { label: "Composite (cust_id, date)", ms: loadComposite },
     ]
   );
 }
@@ -314,9 +382,11 @@ async function demo6() {
   const sql = `SELECT COUNT(*) FROM orders WHERE status = 'pending'`;
 
   const without = await timeQuery("No index", sql);
+  const loadWithout = await simulateLoad(sql);
 
   await createIndex(`CREATE INDEX idx_orders_status ON orders (status)`);
   const withIdx = await timeQuery("With index", sql);
+  const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_status");
 
   printComparison(
@@ -324,7 +394,11 @@ async function demo6() {
     "Filter by status (low cardinality)",
     "5 values, ~20% each → index provides minimal/no benefit",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
@@ -332,9 +406,11 @@ async function demo7() {
   const sql = `SELECT status, COUNT(*) FROM orders GROUP BY status`;
 
   const without = await timeQuery("No index", sql);
+  const loadWithout = await simulateLoad(sql);
 
   await createIndex(`CREATE INDEX idx_orders_status ON orders (status)`);
   const withIdx = await timeQuery("With index", sql);
+  const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_status");
 
   printComparison(
@@ -342,30 +418,31 @@ async function demo7() {
     "COUNT(*) GROUP BY status",
     "Must touch every row → index can't avoid full scan",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 
 async function demo8() {
-  const sqlNoIndex = await timeQuery(
-    "SQL WHERE",
-    `SELECT * FROM products WHERE category = 'Electronics'`
-  );
+  const sqlWhere = `SELECT * FROM products WHERE category = 'Electronics'`;
+  const sqlAll = `SELECT * FROM products`;
+
+  const sqlNoIndex = await timeQuery("SQL WHERE", sqlWhere);
+  const loadNoIndex = await simulateLoad(sqlWhere);
 
   // Fetch all + JS filter — use EXPLAIN ANALYZE for the fetch, add negligible JS time
-  const { plan: jsPlan, execTimeMs: jsDbTime } = await runExplainAnalyze(
-    `SELECT * FROM products`
-  );
-  // The JS filter on 500 rows is sub-microsecond, so jsDbTime is the total
+  const { plan: jsPlan, execTimeMs: jsDbTime } = await runExplainAnalyze(sqlAll);
   const jsResult = { label: "Fetch all + JS filter", timeMs: jsDbTime, plan: jsPlan };
+  const loadJs = await simulateLoad(sqlAll);
 
   await createIndex(
     `CREATE INDEX idx_products_category ON products (category)`
   );
-  const sqlIndexed = await timeQuery(
-    "SQL WHERE + index",
-    `SELECT * FROM products WHERE category = 'Electronics'`
-  );
+  const sqlIndexed = await timeQuery("SQL WHERE + index", sqlWhere);
+  const loadIndexed = await simulateLoad(sqlWhere);
   await dropIndex("idx_products_category");
 
   printSingleResult(
@@ -384,6 +461,11 @@ async function demo8() {
         timeMs: sqlIndexed.timeMs,
         plan: sqlIndexed.plan,
       },
+    ],
+    [
+      { label: "SQL WHERE (no index)", ms: loadNoIndex },
+      { label: "Fetch all + JS filter", ms: loadJs },
+      { label: "SQL WHERE + index", ms: loadIndexed },
     ]
   );
 }
@@ -393,11 +475,13 @@ async function demo9() {
   const sql = `SELECT COUNT(*) FROM orders WHERE total_amount > 0`;
 
   const without = await timeQuery("No index", sql);
+  const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_orders_total_amount ON orders (total_amount)`
   );
   const withIdx = await timeQuery("With index", sql);
+  const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_total_amount");
 
   printComparison(
@@ -405,7 +489,11 @@ async function demo9() {
     "WHERE total_amount > 0 (95%+ match)",
     "Non-selective predicate → index overhead, Seq Scan preferred",
     without,
-    withIdx
+    withIdx,
+    [
+      { label: "Without index", ms: loadWithout },
+      { label: "With index", ms: loadWith },
+    ]
   );
 }
 

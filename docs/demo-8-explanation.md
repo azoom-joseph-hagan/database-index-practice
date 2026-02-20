@@ -4,13 +4,13 @@
 
 ```sql
 -- Approach 1: SQL WHERE (no index)
-SELECT * FROM products WHERE category = 'Electronics'
+SELECT * FROM products WHERE category = 'Electronics';
 
 -- Approach 2: Fetch all rows, filter in JavaScript
-SELECT * FROM products  -- then: rows.filter(r => r.category === 'Electronics')
+SELECT * FROM products;  -- then: rows.filter(r => r.category === 'Electronics')
 
 -- Approach 3: SQL WHERE (with index on category)
-SELECT * FROM products WHERE category = 'Electronics'
+SELECT * FROM products WHERE category = 'Electronics';
 ```
 
 ## What Happens
@@ -40,3 +40,9 @@ These thresholds also depend on row width — a table with 5,000 rows but 50 col
 ## The JavaScript Filter Question
 
 A common question is whether it's better to filter in the database or in application code. For small tables, it does not matter — the network round-trip to the database is likely the largest cost either way. For large tables, always filter in SQL — you don't want to transfer millions of rows over the network just to discard most of them in your application.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_products_category;
+```

@@ -4,7 +4,7 @@
 
 ```sql
 -- customer_id varies per run; 37760 is used as an example
-SELECT * FROM orders WHERE customer_id = 37760
+SELECT * FROM orders WHERE customer_id = 37760;
 ```
 
 ## What Happens Without an Index
@@ -22,7 +22,7 @@ Parallel Seq Scan on orders
 ## Why the Index Helps
 
 ```sql
-CREATE INDEX idx_orders_customer_id ON orders (customer_id)
+CREATE INDEX idx_orders_customer_id ON orders (customer_id);
 ```
 
 This is a common foreign key index use case. The `customer_id` column points back to the `customers` table, and you frequently need to ask "give me all orders for customer X."
@@ -36,3 +36,9 @@ With the index, PostgreSQL looks up `customer_id = 37760` in the B-tree, finds t
 - **Foreign key pattern**: This is one of the most common reasons to add an index. PostgreSQL does *not* automatically create indexes on foreign key columns (unlike primary keys). If you define a FK constraint but don't add an index, every lookup by that FK column will be a full table scan.
 
 This is often the most important index you can add to a database — and one of the most commonly forgotten.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_customer_id;
+```

@@ -3,7 +3,7 @@
 ## The Query
 
 ```sql
-SELECT COUNT(*) FROM orders WHERE status = 'pending'
+SELECT COUNT(*) FROM orders WHERE status = 'pending';
 ```
 
 ## What Happens
@@ -46,3 +46,9 @@ Should you add this index? It depends on context:
 - If this query runs thousands of times per second, a consistent 1.3x improvement is significant in total.
 - If it runs occasionally, the write overhead of maintaining the index on every INSERT/UPDATE probably isn't worth the marginal read improvement.
 - The index also costs disk space — a question of whether that 20–30% speedup justifies the storage and write penalty.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_status;
+```

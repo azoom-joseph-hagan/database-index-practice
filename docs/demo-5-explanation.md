@@ -6,7 +6,7 @@
 -- customer_id varies per run; 37760 is used as an example
 SELECT * FROM orders
 WHERE customer_id = 37760
-  AND created_at BETWEEN '2024-01-01' AND '2024-03-31'
+  AND created_at BETWEEN '2024-01-01' AND '2024-03-31';
 ```
 
 ## What It Compares
@@ -20,7 +20,7 @@ This demo runs the same query three ways:
 ## How the Single-Column Index Works
 
 ```sql
-CREATE INDEX idx_orders_customer_id ON orders (customer_id)
+CREATE INDEX idx_orders_customer_id ON orders (customer_id);
 ```
 
 PostgreSQL uses the index to quickly find all ~20 orders for customer 37760. Then it applies the `created_at` filter to those 20 rows in memory. You'll see this in the EXPLAIN output:
@@ -37,7 +37,7 @@ The `Filter` line means some rows passed the index lookup but were discarded aft
 ## How the Composite Index Works
 
 ```sql
-CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at)
+CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
 ```
 
 A composite index is sorted by the first column, then by the second column within each first-column value. Think of it like a phone book sorted by last name, then first name:
@@ -80,3 +80,10 @@ But it does **not** efficiently support:
 - `WHERE created_at BETWEEN ...` alone (the first column isn't constrained, so the index cannot reduce the search space)
 
 Think of it like the phone book: you can look up all "Smiths" or "Smith, John" — but you can't easily find all "Johns" across all last names.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_customer_id;
+DROP INDEX idx_orders_cust_date;
+```

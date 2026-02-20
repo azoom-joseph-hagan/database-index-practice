@@ -3,7 +3,7 @@
 ## The Query
 
 ```sql
-SELECT status, COUNT(*) FROM orders GROUP BY status
+SELECT status, COUNT(*) FROM orders GROUP BY status;
 ```
 
 ## What Happens
@@ -33,3 +33,9 @@ If you need these aggregations to be fast, the solutions are different from inde
 - **Materialized views**: Pre-compute the aggregation and refresh it periodically.
 - **Summary tables**: Maintain running counts as data changes.
 - **Partitioning**: Split the table by date or status so the database only scans the relevant partition.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_status;
+```

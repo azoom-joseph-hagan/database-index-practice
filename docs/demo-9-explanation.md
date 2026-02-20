@@ -3,7 +3,7 @@
 ## The Query
 
 ```sql
-SELECT COUNT(*) FROM orders WHERE total_amount > 0
+SELECT COUNT(*) FROM orders WHERE total_amount > 0;
 ```
 
 ## What Happens
@@ -26,10 +26,10 @@ It's not about whether a column has an index — it's about whether the specific
 
 ```sql
 -- This IS selective: maybe 0.1% of orders
-SELECT COUNT(*) FROM orders WHERE total_amount > 1900
+SELECT COUNT(*) FROM orders WHERE total_amount > 1900;
 
 -- This is NOT selective: 95%+ of orders
-SELECT COUNT(*) FROM orders WHERE total_amount > 0
+SELECT COUNT(*) FROM orders WHERE total_amount > 0;
 ```
 
 PostgreSQL makes this decision per-query based on the actual value you're filtering on and the column's data distribution statistics.
@@ -44,3 +44,9 @@ When you run `ANALYZE` on a table, PostgreSQL samples the data and stores statis
 The query planner uses these statistics to estimate how many rows a given `WHERE` clause will match. If the estimate is above a certain fraction of the table, it skips the index.
 
 This is why running `ANALYZE` (or letting autovacuum do it) is important — stale statistics can lead PostgreSQL to make bad choices, like using an index when a Seq Scan would be faster, or vice versa.
+
+## Cleanup
+
+```sql
+DROP INDEX idx_orders_total_amount;
+```
