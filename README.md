@@ -41,6 +41,7 @@ This runs 9 scenarios that each:
 Each demo has a detailed explanation in the `docs-en/` folder. Start with [Index Basics](docs-en/index-basics.md) if you're new to indexes or EXPLAIN ANALYZE.
 
 > **日本語版**: [README-jp.md](README-jp.md) | [docs-jp/](docs-jp/)
+> **Tiếng Việt**: [README-vn.md](README-vn.md) | [docs-vn/](docs-vn/)
 
 | # | Demo | Takeaway | Explanation |
 |---|------|----------|-------------|
