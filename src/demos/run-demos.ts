@@ -1,4 +1,5 @@
 import pg from "pg";
+import { locale } from "./locale/index.js";
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -6,6 +7,7 @@ const pool = new pg.Pool({
 
 const ITERATIONS = 5;
 const LOAD_QUERIES = 100;
+const BOX_WIDTH = 70;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -14,6 +16,31 @@ interface DemoResult {
   timeMs: number;
   plan: string;
   loadMs?: number;
+}
+
+/** Display-width-aware padEnd for CJK characters (double-width in terminals). */
+function displayWidth(str: string): number {
+  let w = 0;
+  for (const ch of str) {
+    const cp = ch.codePointAt(0)!;
+    // CJK Unified Ideographs, Hiragana, Katakana, Fullwidth forms, CJK symbols
+    if (
+      (cp >= 0x3000 && cp <= 0x9fff) ||
+      (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xff01 && cp <= 0xff60) ||
+      (cp >= 0xffe0 && cp <= 0xffe6)
+    ) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
+function padEndDisplay(str: string, width: number): string {
+  const diff = width - displayWidth(str);
+  return diff > 0 ? str + " ".repeat(diff) : str;
 }
 
 function extractExecutionTime(plan: string): number {
@@ -83,10 +110,14 @@ function formatTime(ms: number): string {
   return `${ms.toFixed(0)} ms`;
 }
 
+function boxLine(content: string): string {
+  return `║  ${padEndDisplay(content, BOX_WIDTH - 2)}║`;
+}
+
 function printLoadComparison(loads: { label: string; ms: number }[]) {
-  console.log(`  If ${LOAD_QUERIES} requests hit this endpoint:`);
+  console.log(`  ${locale.loadSimHeader(LOAD_QUERIES)}`);
   for (const l of loads) {
-    console.log(`      ${l.label.padEnd(30)} ${formatTime(l.ms).padStart(10)}`);
+    console.log(`      ${padEndDisplay(l.label, 30)} ${formatTime(l.ms).padStart(10)}`);
   }
   console.log("");
 }
@@ -100,42 +131,39 @@ function printComparison(
   loadResults?: { label: string; ms: number }[]
 ) {
   const speedup = without.timeMs / withIdx.timeMs;
-  const bar = "═".repeat(70);
+  const bar = "═".repeat(BOX_WIDTH);
 
   console.log(`\n╔${bar}╗`);
-  console.log(`║  Demo ${demoNum}: ${title.padEnd(62)}║`);
+  console.log(boxLine(`Demo ${demoNum}: ${title}`));
   console.log(`╠${bar}╣`);
-  console.log(`║  ${description.padEnd(68)}║`);
+  console.log(boxLine(description));
   console.log(`╠${bar}╣`);
   console.log(
-    `║  WITHOUT index: ${without.timeMs.toFixed(2).padStart(9)} ms  (median of ${ITERATIONS} runs, EXPLAIN ANALYZE)`
-      .padEnd(71) + "║"
+    boxLine(
+      `WITHOUT index: ${without.timeMs.toFixed(2).padStart(9)} ms  (${locale.medianOf(ITERATIONS)})`
+    )
   );
   console.log(
-    `║  WITH    index: ${withIdx.timeMs.toFixed(2).padStart(9)} ms`
-      .padEnd(71) + "║"
+    boxLine(
+      `WITH    index: ${withIdx.timeMs.toFixed(2).padStart(9)} ms`
+    )
   );
-  console.log(`║${"─".repeat(70)}║`);
+  console.log(`║${"─".repeat(BOX_WIDTH)}║`);
   if (speedup >= 1.05) {
-    console.log(
-      `║  Speedup: ${speedup.toFixed(1)}x faster`.padEnd(71) + "║"
-    );
+    console.log(boxLine(locale.speedup(speedup.toFixed(1))));
   } else if (speedup < 0.95) {
-    console.log(
-      `║  Result: ${(1 / speedup).toFixed(1)}x SLOWER with index`.padEnd(71) +
-        "║"
-    );
+    console.log(boxLine(locale.slower((1 / speedup).toFixed(1))));
   } else {
-    console.log(`║  Result: ~same performance`.padEnd(71) + "║");
+    console.log(boxLine(locale.samePerfResult));
   }
   console.log(`╚${bar}╝`);
 
-  console.log("\n  EXPLAIN ANALYZE (without index):");
+  console.log(`\n  ${locale.explainWithout}`);
   for (const line of without.plan.split("\n").slice(0, 8)) {
     console.log(`    ${line}`);
   }
 
-  console.log("\n  EXPLAIN ANALYZE (with index):");
+  console.log(`\n  ${locale.explainWith}`);
   for (const line of withIdx.plan.split("\n").slice(0, 8)) {
     console.log(`    ${line}`);
   }
@@ -153,23 +181,21 @@ function printSingleResult(
   results: { label: string; timeMs: number; plan?: string }[],
   loadResults?: { label: string; ms: number }[]
 ) {
-  const bar = "═".repeat(70);
+  const bar = "═".repeat(BOX_WIDTH);
 
   console.log(`\n╔${bar}╗`);
-  console.log(`║  Demo ${demoNum}: ${title.padEnd(62)}║`);
+  console.log(boxLine(`Demo ${demoNum}: ${title}`));
   console.log(`╠${bar}╣`);
-  console.log(`║  ${description.padEnd(68)}║`);
+  console.log(boxLine(description));
   console.log(`╠${bar}╣`);
   for (const r of results) {
-    console.log(
-      `║  ${r.label}: ${r.timeMs.toFixed(2).padStart(9)} ms`.padEnd(71) + "║"
-    );
+    console.log(boxLine(`${r.label}: ${r.timeMs.toFixed(2).padStart(9)} ms`));
   }
   console.log(`╚${bar}╝`);
 
   for (const r of results) {
     if (r.plan) {
-      console.log(`\n  EXPLAIN ANALYZE (${r.label}):`);
+      console.log(`\n  ${locale.explain(r.label)}`);
       for (const line of r.plan.split("\n").slice(0, 6)) {
         console.log(`    ${line}`);
       }
@@ -200,25 +226,25 @@ async function warmUp() {
 async function demo1() {
   const sql = `SELECT * FROM customers WHERE last_name = 'Swallows'`;
 
-  const without = await timeQuery("No index", sql);
+  const without = await timeQuery(locale.noIndex, sql);
   const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_customers_last_name ON customers (last_name)`
   );
-  const withIdx = await timeQuery("With index", sql);
+  const withIdx = await timeQuery(locale.withIndex, sql);
   const loadWith = await simulateLoad(sql);
   await dropIndex("idx_customers_last_name");
 
   printComparison(
     1,
-    "Lookup by last_name (50k rows)",
-    "Selective text search on a medium table → Index Scan wins",
+    locale.demos.demo1.title,
+    locale.demos.demo1.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -231,25 +257,25 @@ async function demo2() {
 
   const sql = `SELECT * FROM orders WHERE customer_id = $1`;
 
-  const without = await timeQuery("No index", sql, [custId]);
+  const without = await timeQuery(locale.noIndex, sql, [custId]);
   const loadWithout = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_customer_id ON orders (customer_id)`
   );
-  const withIdx = await timeQuery("With index", sql, [custId]);
+  const withIdx = await timeQuery(locale.withIndex, sql, [custId]);
   const loadWith = await simulateLoad(sql, [custId]);
   await dropIndex("idx_orders_customer_id");
 
   printComparison(
     2,
-    "Orders by customer_id (1M rows)",
-    "FK lookup returning ~20 rows from 1M → massive speedup",
+    locale.demos.demo2.title,
+    locale.demos.demo2.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -257,25 +283,25 @@ async function demo2() {
 async function demo3() {
   const sql = `SELECT * FROM orders WHERE created_at BETWEEN '2024-06-01' AND '2024-06-07'`;
 
-  const without = await timeQuery("No index", sql);
+  const without = await timeQuery(locale.noIndex, sql);
   const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_orders_created_at ON orders (created_at)`
   );
-  const withIdx = await timeQuery("With index", sql);
+  const withIdx = await timeQuery(locale.withIndex, sql);
   const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_created_at");
 
   printComparison(
     3,
-    "Date range on orders.created_at",
-    "Narrow 7-day window from 3 years of data → Index Range Scan",
+    locale.demos.demo3.title,
+    locale.demos.demo3.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -293,7 +319,7 @@ async function demo4() {
     WHERE o.customer_id = $1
   `;
 
-  const without = await timeQuery("No index", sql, [custId]);
+  const without = await timeQuery(locale.noIndex, sql, [custId]);
   const loadWithout = await simulateLoad(sql, [custId]);
 
   await createIndex(
@@ -302,20 +328,20 @@ async function demo4() {
   await createIndex(
     `CREATE INDEX idx_order_items_order_id ON order_items (order_id)`
   );
-  const withIdx = await timeQuery("With index", sql, [custId]);
+  const withIdx = await timeQuery(locale.withIndex, sql, [custId]);
   const loadWith = await simulateLoad(sql, [custId]);
   await dropIndex("idx_orders_customer_id");
   await dropIndex("idx_order_items_order_id");
 
   printComparison(
     4,
-    "JOIN orders + order_items for a customer",
-    "Nested loop with seq scans vs indexed join → huge difference",
+    locale.demos.demo4.title,
+    locale.demos.demo4.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -332,19 +358,19 @@ async function demo5() {
       AND created_at BETWEEN '2024-01-01' AND '2024-03-31'
   `;
 
-  const without = await timeQuery("No index", sql, [custId]);
+  const without = await timeQuery(locale.noIndex, sql, [custId]);
   const loadNone = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_customer_id ON orders (customer_id)`
   );
-  const singleIdx = await timeQuery("Single-col index", sql, [custId]);
+  const singleIdx = await timeQuery(locale.singleColIndex, sql, [custId]);
   const loadSingle = await simulateLoad(sql, [custId]);
 
   await createIndex(
     `CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at)`
   );
-  const compositeIdx = await timeQuery("Composite index", sql, [custId]);
+  const compositeIdx = await timeQuery(locale.compositeIndex, sql, [custId]);
   const loadComposite = await simulateLoad(sql, [custId]);
 
   await dropIndex("idx_orders_customer_id");
@@ -352,25 +378,25 @@ async function demo5() {
 
   printSingleResult(
     5,
-    "Composite index (customer_id, created_at)",
-    "Single-col vs composite for multi-predicate queries",
+    locale.demos.demo5.title,
+    locale.demos.demo5.description,
     [
-      { label: "No index", timeMs: without.timeMs, plan: without.plan },
+      { label: locale.noIndex, timeMs: without.timeMs, plan: without.plan },
       {
-        label: "Single-col (customer_id)",
+        label: locale.singleColIndex,
         timeMs: singleIdx.timeMs,
         plan: singleIdx.plan,
       },
       {
-        label: "Composite (customer_id, created_at)",
+        label: locale.compositeIndex,
         timeMs: compositeIdx.timeMs,
         plan: compositeIdx.plan,
       },
     ],
     [
-      { label: "No index", ms: loadNone },
-      { label: "Single-col (customer_id)", ms: loadSingle },
-      { label: "Composite (cust_id, date)", ms: loadComposite },
+      { label: locale.noIndex, ms: loadNone },
+      { label: locale.singleColIndex, ms: loadSingle },
+      { label: locale.compositeIndex, ms: loadComposite },
     ]
   );
 }
@@ -381,23 +407,23 @@ async function demo6() {
   // Use COUNT to avoid result-transfer noise — we only care about scan strategy
   const sql = `SELECT COUNT(*) FROM orders WHERE status = 'pending'`;
 
-  const without = await timeQuery("No index", sql);
+  const without = await timeQuery(locale.noIndex, sql);
   const loadWithout = await simulateLoad(sql);
 
   await createIndex(`CREATE INDEX idx_orders_status ON orders (status)`);
-  const withIdx = await timeQuery("With index", sql);
+  const withIdx = await timeQuery(locale.withIndex, sql);
   const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_status");
 
   printComparison(
     6,
-    "Filter by status (low cardinality)",
-    "5 values, ~20% each → index provides minimal/no benefit",
+    locale.demos.demo6.title,
+    locale.demos.demo6.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -405,23 +431,23 @@ async function demo6() {
 async function demo7() {
   const sql = `SELECT status, COUNT(*) FROM orders GROUP BY status`;
 
-  const without = await timeQuery("No index", sql);
+  const without = await timeQuery(locale.noIndex, sql);
   const loadWithout = await simulateLoad(sql);
 
   await createIndex(`CREATE INDEX idx_orders_status ON orders (status)`);
-  const withIdx = await timeQuery("With index", sql);
+  const withIdx = await timeQuery(locale.withIndex, sql);
   const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_status");
 
   printComparison(
     7,
-    "COUNT(*) GROUP BY status",
-    "Must touch every row → index can't avoid full scan",
+    locale.demos.demo7.title,
+    locale.demos.demo7.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -430,42 +456,42 @@ async function demo8() {
   const sqlWhere = `SELECT * FROM products WHERE category = 'Electronics'`;
   const sqlAll = `SELECT * FROM products`;
 
-  const sqlNoIndex = await timeQuery("SQL WHERE", sqlWhere);
+  const sqlNoIndex = await timeQuery(locale.sqlWhereNoIndex, sqlWhere);
   const loadNoIndex = await simulateLoad(sqlWhere);
 
   // Fetch all + JS filter — use EXPLAIN ANALYZE for the fetch, add negligible JS time
   const { plan: jsPlan, execTimeMs: jsDbTime } = await runExplainAnalyze(sqlAll);
-  const jsResult = { label: "Fetch all + JS filter", timeMs: jsDbTime, plan: jsPlan };
+  const jsResult = { label: locale.fetchAllJsFilter, timeMs: jsDbTime, plan: jsPlan };
   const loadJs = await simulateLoad(sqlAll);
 
   await createIndex(
     `CREATE INDEX idx_products_category ON products (category)`
   );
-  const sqlIndexed = await timeQuery("SQL WHERE + index", sqlWhere);
+  const sqlIndexed = await timeQuery(locale.sqlWhereWithIndex, sqlWhere);
   const loadIndexed = await simulateLoad(sqlWhere);
   await dropIndex("idx_products_category");
 
   printSingleResult(
     8,
-    "Small table (500 rows): index vs no index vs JS",
-    "Tiny tables → all approaches are virtually identical",
+    locale.demos.demo8.title,
+    locale.demos.demo8.description,
     [
       {
-        label: "SQL WHERE (no index)",
+        label: locale.sqlWhereNoIndex,
         timeMs: sqlNoIndex.timeMs,
         plan: sqlNoIndex.plan,
       },
       jsResult,
       {
-        label: "SQL WHERE + index",
+        label: locale.sqlWhereWithIndex,
         timeMs: sqlIndexed.timeMs,
         plan: sqlIndexed.plan,
       },
     ],
     [
-      { label: "SQL WHERE (no index)", ms: loadNoIndex },
-      { label: "Fetch all + JS filter", ms: loadJs },
-      { label: "SQL WHERE + index", ms: loadIndexed },
+      { label: locale.sqlWhereNoIndex, ms: loadNoIndex },
+      { label: locale.fetchAllJsFilter, ms: loadJs },
+      { label: locale.sqlWhereWithIndex, ms: loadIndexed },
     ]
   );
 }
@@ -474,25 +500,25 @@ async function demo9() {
   // Use COUNT to avoid transferring 1M rows and measuring network time
   const sql = `SELECT COUNT(*) FROM orders WHERE total_amount > 0`;
 
-  const without = await timeQuery("No index", sql);
+  const without = await timeQuery(locale.noIndex, sql);
   const loadWithout = await simulateLoad(sql);
 
   await createIndex(
     `CREATE INDEX idx_orders_total_amount ON orders (total_amount)`
   );
-  const withIdx = await timeQuery("With index", sql);
+  const withIdx = await timeQuery(locale.withIndex, sql);
   const loadWith = await simulateLoad(sql);
   await dropIndex("idx_orders_total_amount");
 
   printComparison(
     9,
-    "WHERE total_amount > 0 (95%+ match)",
-    "Non-selective predicate → index overhead, Seq Scan preferred",
+    locale.demos.demo9.title,
+    locale.demos.demo9.description,
     without,
     withIdx,
     [
-      { label: "Without index", ms: loadWithout },
-      { label: "With index", ms: loadWith },
+      { label: locale.withoutIndex, ms: loadWithout },
+      { label: locale.withIndex, ms: loadWith },
     ]
   );
 }
@@ -500,20 +526,13 @@ async function demo9() {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(
-    "╔══════════════════════════════════════════════════════════════════════╗"
-  );
-  console.log(
-    "║           DATABASE INDEX PRACTICE — Demo Results                    ║"
-  );
-  console.log(
-    "╚══════════════════════════════════════════════════════════════════════╝"
-  );
+  const bar = "═".repeat(BOX_WIDTH);
+  console.log(`╔${bar}╗`);
+  console.log(boxLine(locale.banner));
+  console.log(`╚${bar}╝`);
 
-  console.log(
-    `\nWarming up (running ANALYZE, priming buffer cache)...`
-  );
-  console.log(`Each query runs ${ITERATIONS} times; median Execution Time from EXPLAIN ANALYZE shown.\n`);
+  console.log(`\n${locale.warmingUp}`);
+  console.log(`${locale.iterationNote(ITERATIONS)}\n`);
   await warmUp();
 
   const counts = await Promise.all([
@@ -522,7 +541,7 @@ async function main() {
     pool.query("SELECT COUNT(*) FROM orders"),
     pool.query("SELECT COUNT(*) FROM order_items"),
   ]);
-  console.log("Table sizes:");
+  console.log(locale.tableSizes);
   console.log(
     `  customers:   ${Number(counts[0].rows[0].count).toLocaleString()}`
   );
@@ -539,7 +558,7 @@ async function main() {
   console.log(
     "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   );
-  console.log("  PART 1: Where Indexes WIN");
+  console.log(`  ${locale.part1Header}`);
   console.log(
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   );
@@ -553,7 +572,7 @@ async function main() {
   console.log(
     "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   );
-  console.log("  PART 2: Where Indexes DON'T Help");
+  console.log(`  ${locale.part2Header}`);
   console.log(
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   );
@@ -563,20 +582,14 @@ async function main() {
   await demo8();
   await demo9();
 
-  console.log(
-    "\n╔══════════════════════════════════════════════════════════════════════╗"
-  );
-  console.log(
-    "║                          All demos complete!                        ║"
-  );
-  console.log(
-    "╚══════════════════════════════════════════════════════════════════════╝\n"
-  );
+  console.log(`\n╔${bar}╗`);
+  console.log(boxLine(locale.allComplete));
+  console.log(`╚${bar}╝\n`);
 
   await pool.end();
 }
 
 main().catch((err) => {
-  console.error("Demo failed:", err);
+  console.error(locale.demoFailed, err);
   process.exit(1);
 });

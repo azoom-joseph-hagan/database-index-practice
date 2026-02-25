@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "seed": "node --env-file=.env --import=tsx src/seed.ts",
-    "demo": "node --env-file=.env --import=tsx src/demos/run-demos.ts"
+    "demo": "node --env-file=.env --import=tsx src/demos/run-demos.ts",
+    "demo:jp": "node --env-file=.env --import=tsx src/demos/run-demos.ts --jp"
   },
   "dependencies": {
     "drizzle-orm": "^0.39.0",

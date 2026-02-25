@@ -38,21 +38,23 @@ This runs 9 scenarios that each:
 
 ### What the Demos Cover
 
-Each demo has a detailed explanation in the `docs/` folder. Start with [Index Basics](docs/index-basics.md) if you're new to indexes or EXPLAIN ANALYZE.
+Each demo has a detailed explanation in the `docs-en/` folder. Start with [Index Basics](docs-en/index-basics.md) if you're new to indexes or EXPLAIN ANALYZE.
+
+> **日本語版**: [README-jp.md](README-jp.md) | [docs-jp/](docs-jp/)
 
 | # | Demo | Takeaway | Explanation |
 |---|------|----------|-------------|
 | **Part 1: Where Indexes WIN** | | | |
-| 1 | Lookup by `last_name` (50k rows) | Seq Scan → Index Scan on selective query | [Read more](docs/demo-1-explanation.md) |
-| 2 | Orders by `customer_id` (1M rows) | FK lookup returns ~20 rows from 1M | [Read more](docs/demo-2-explanation.md) |
-| 3 | Date range on `orders.created_at` | Narrow 7-day window from 3 years of data | [Read more](docs/demo-3-explanation.md) |
-| 4 | JOIN orders + order_items | Nested loop seq scan vs indexed join | [Read more](docs/demo-4-explanation.md) |
-| 5 | Composite index `(customer_id, created_at)` | Single-col vs composite for multi-predicate queries | [Read more](docs/demo-5-explanation.md) |
+| 1 | Lookup by `last_name` (50k rows) | Seq Scan → Index Scan on selective query | [Read more](docs-en/demo-1-explanation.md) |
+| 2 | Orders by `customer_id` (1M rows) | FK lookup returns ~20 rows from 1M | [Read more](docs-en/demo-2-explanation.md) |
+| 3 | Date range on `orders.created_at` | Narrow 7-day window from 3 years of data | [Read more](docs-en/demo-3-explanation.md) |
+| 4 | JOIN orders + order_items | Nested loop seq scan vs indexed join | [Read more](docs-en/demo-4-explanation.md) |
+| 5 | Composite index `(customer_id, created_at)` | Single-col vs composite for multi-predicate queries | [Read more](docs-en/demo-5-explanation.md) |
 | **Part 2: Where Indexes DON'T Help (Much)** | | | |
-| 6 | Filter by `status` (5 values, ~20% each) | Low cardinality — marginal improvement vs 100x+ wins above | [Read more](docs/demo-6-explanation.md) |
-| 7 | `COUNT(*) GROUP BY status` | Must touch every row — ~same performance | [Read more](docs/demo-7-explanation.md) |
-| 8 | Small table: SQL vs JS filter (500 rows) | All approaches near-identical on tiny tables | [Read more](docs/demo-8-explanation.md) |
-| 9 | `WHERE total_amount > 0` (95%+ match) | Non-selective predicate — ~same performance | [Read more](docs/demo-9-explanation.md) |
+| 6 | Filter by `status` (5 values, ~20% each) | Low cardinality — marginal improvement vs 100x+ wins above | [Read more](docs-en/demo-6-explanation.md) |
+| 7 | `COUNT(*) GROUP BY status` | Must touch every row — ~same performance | [Read more](docs-en/demo-7-explanation.md) |
+| 8 | Small table: SQL vs JS filter (500 rows) | All approaches near-identical on tiny tables | [Read more](docs-en/demo-8-explanation.md) |
+| 9 | `WHERE total_amount > 0` (95%+ match) | Non-selective predicate — ~same performance | [Read more](docs-en/demo-9-explanation.md) |
 
 ## Tear Down
 
