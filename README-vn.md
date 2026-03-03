@@ -24,17 +24,15 @@ pnpm drizzle-kit push
 pnpm seed
 ```
 
-## Chạy Demo
+## Cách sử dụng
 
 ```bash
-# Phiên bản tiếng Anh
-pnpm demo
-
-# Phiên bản tiếng Việt
 pnpm demo:vn
 ```
 
-Mỗi kịch bản sẽ:
+Cách tốt nhất để học từ dự án này là chạy demo và đọc tài liệu giải thích tương ứng cho từng kịch bản cùng lúc. Khi mỗi demo hiển thị kết quả, hãy mở bài giải thích phù hợp từ bảng bên dưới để hiểu **tại sao** các con số lại như vậy.
+
+Mỗi demo sẽ:
 1. Chạy truy vấn **không có** index và ghi lại thời gian + `EXPLAIN ANALYZE`
 2. Tạo index và chạy cùng truy vấn **có** index
 3. Hiển thị so sánh song song với hệ số tăng tốc
@@ -42,7 +40,7 @@ Mỗi kịch bản sẽ:
 
 ### Nội dung các Demo
 
-Mỗi demo có giải thích chi tiết trong thư mục `docs-vn/`. Nếu bạn mới làm quen với index hoặc EXPLAIN ANALYZE, hãy bắt đầu với [Kiến thức cơ bản về Index](docs-vn/index-basics.md).
+Nếu bạn mới làm quen với index hoặc EXPLAIN ANALYZE, hãy bắt đầu với [Kiến thức cơ bản về Index](docs-vn/index-basics.md).
 
 | # | Demo | Điểm chính | Giải thích |
 |---|------|------------|------------|

@@ -24,24 +24,26 @@ pnpm drizzle-kit push
 pnpm seed
 ```
 
-## Run the Demos
+## How to Use
 
 ```bash
 pnpm demo
 ```
 
-This runs 9 scenarios that each:
-1. Run a query **without** an index and capture timing + `EXPLAIN ANALYZE`
-2. Create an index and run the same query **with** the index
-3. Print a side-by-side comparison with the speedup factor
-4. Drop the index (reset for the next demo)
+The best way to learn from this project is to run the demo and read the corresponding doc for each scenario side by side. As each demo prints its results, open the matching explanation from the table below to understand **why** the numbers look the way they do.
+
+> **日本語版**: [README-jp.md](README-jp.md) — `pnpm demo:jp`
+> **Tiếng Việt**: [README-vn.md](README-vn.md) — `pnpm demo:vn`
+
+Each demo:
+1. Runs a query **without** an index and captures timing + `EXPLAIN ANALYZE`
+2. Creates an index and runs the same query **with** the index
+3. Prints a side-by-side comparison with the speedup factor
+4. Drops the index (reset for the next demo)
 
 ### What the Demos Cover
 
-Each demo has a detailed explanation in the `docs-en/` folder. Start with [Index Basics](docs-en/index-basics.md) if you're new to indexes or EXPLAIN ANALYZE.
-
-> **日本語版**: [README-jp.md](README-jp.md) | [docs-jp/](docs-jp/)
-> **Tiếng Việt**: [README-vn.md](README-vn.md) | [docs-vn/](docs-vn/)
+If you're new to indexes or EXPLAIN ANALYZE, start with [Index Basics](docs-en/index-basics.md).
 
 | # | Demo | Takeaway | Explanation |
 |---|------|----------|-------------|
