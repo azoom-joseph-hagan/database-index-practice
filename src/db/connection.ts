@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: "postgresql://postgres:postgres@localhost:5499/index_practice",
 });
 
 export const db = drizzle(pool, { schema });

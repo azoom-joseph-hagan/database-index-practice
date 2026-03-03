@@ -2,7 +2,7 @@ import pg from "pg";
 import { locale } from "./locale/index.js";
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: "postgresql://postgres:postgres@localhost:5499/index_practice",
 });
 
 const ITERATIONS = 5;

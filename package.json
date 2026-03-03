@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "seed": "node --env-file=.env --import=tsx src/seed.ts",
-    "demo": "node --env-file=.env --import=tsx src/demos/run-demos.ts",
-    "demo:jp": "node --env-file=.env --import=tsx src/demos/run-demos.ts --jp",
-    "demo:vn": "node --env-file=.env --import=tsx src/demos/run-demos.ts --vn"
+    "seed": "node --import=tsx src/seed.ts",
+    "demo": "node --import=tsx src/demos/run-demos.ts",
+    "demo:jp": "node --import=tsx src/demos/run-demos.ts --jp",
+    "demo:vn": "node --import=tsx src/demos/run-demos.ts --vn"
   },
   "dependencies": {
     "drizzle-orm": "^0.39.0",
